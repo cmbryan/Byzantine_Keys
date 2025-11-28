@@ -37,6 +37,8 @@
         /* New Key Colors */
         .key-ni-low { background-color: #f43f5e; color: white; opacity: 0.7; }
         .key-vou-high { background-color: #8b5cf6; color: white; opacity: 0.7; }
+        /* Soft chromatic key visuals */
+        .key-softchr { background-color: #eef2ff; color: #1f2937; opacity: 0.95; border: 1px solid #c7d2fe; }
 
     </style>
 </head>
@@ -58,6 +60,14 @@
             <div class="flex items-center gap-4">
                 <input type="range" id="pitch-slider" min="0" max="100" value="50" class="w-full h-2 bg-purple-300 rounded-lg appearance-none cursor-pointer range-lg">
                 <span id="pitch-label" class="w-24 text-right font-mono text-base text-gray-800 font-semibold"></span>
+            </div>
+            
+            <div class="flex items-center gap-4 mt-4">
+                <label for="mode-select" class="text-sm font-semibold text-gray-700">Keyboard Mode:</label>
+                <select id="mode-select" class="ml-2 rounded-md border-gray-300 px-2 py-1 text-sm">
+                    <option value="diatonic">Diatonic (default)</option>
+                    <option value="soft-chromatic">Soft Chromatic</option>
+                </select>
             </div>
             
             <div class="flex justify-between items-center mt-3">
@@ -84,7 +94,8 @@
         const MAX_BASE_FREQUENCY = INITIAL_BASE_FREQUENCY * WHOLE_TONE_RATIO; // Approx 294.33 Hz
         
         // GLOBAL TUNING CONSTANT: Multiplier for one comma (1/72nd of an octave)
-        const COMMA_MULTIPLIER = Math.pow(2, 1 / 72); 
+        const COMMA_MULT_DIAT = Math.pow(2, 1 / 72); 
+        const COMMA_MULT_SOFT_CHROM = Math.pow(2, 1 / 64); 
         
         // Global variables for AudioContext and keyboard setup
         let audioContext;
@@ -94,6 +105,10 @@
 
         // Map to store currently playing oscillator and gain nodes for sustained playback
         const activeNotes = new Map();
+        // Current keyboard mode and scale
+        let currentMode = 'diatonic';
+        let currentScale;
+        let bodyMouseUpListenerAdded = false;
 
         // Define harmonic coefficients for a rich, vowel-like sound (PeriodicWave)
         const REAL_COEFFICIENTS = new Float32Array([0, 1.0, 0.4, 0.2, 0.1, 0.05, 0.02, 0]);
@@ -104,19 +119,33 @@
         const BASE_VOLUME = 0.5 / DETUNE_VALUES.length; // Max volume for each voice
 
         // The Byzantine Diatonic Mode in the 72-comma system
-        // Ratios are relative to Pa (C^0) and calculated using the COMMA_MULTIPLIER
+        // Ratios are relative to Pa (C^0) and calculated using the COMMA_MULT_DIAT
         // Comma steps from Pa: 0, 10, 18, 30, 42, 52, 60, 72, 82. Low Ni is -12.
         const BYZANTINE_DIATONIC_SCALE = [
-            { note: "Ni,", ratio: Math.pow(COMMA_MULTIPLIER, -12), class: "key-ni-low" }, // -12 commas
-            { note: "Pa", ratio: Math.pow(COMMA_MULTIPLIER, 0), class: "key-pa" },      // 0 commas
-            { note: "Vou", ratio: Math.pow(COMMA_MULTIPLIER, 10), class: "key-vou" },   // 10 commas
-            { note: "Ga", ratio: Math.pow(COMMA_MULTIPLIER, 18), class: "key-ga" },    // 10 + 8 = 18 commas
-            { note: "Di", ratio: Math.pow(COMMA_MULTIPLIER, 30), class: "key-di" },    // 18 + 12 = 30 commas
-            { note: "Ke", ratio: Math.pow(COMMA_MULTIPLIER, 42), class: "key-ke" },    // 30 + 12 = 42 commas
-            { note: "Zo", ratio: Math.pow(COMMA_MULTIPLIER, 52), class: "key-zo" },    // 42 + 10 = 52 commas
-            { note: "Ni", ratio: Math.pow(COMMA_MULTIPLIER, 60), class: "key-ni" },    // 52 + 8 = 60 commas
-            { note: "Pa'", ratio: Math.pow(COMMA_MULTIPLIER, 72), class: "key-pa-octave" }, // 60 + 12 = 72 commas
-            { note: "Vou'", ratio: Math.pow(COMMA_MULTIPLIER, 82), class: "key-vou-high" } // 72 + 10 = 82 commas
+            { note: "Ni,", ratio: Math.pow(COMMA_MULT_DIAT, -12), class: "key-ni-low" }, // -12 commas
+            { note: "Pa", ratio: Math.pow(COMMA_MULT_DIAT, 0), class: "key-pa" },      // 0 commas
+            { note: "Vou", ratio: Math.pow(COMMA_MULT_DIAT, 10), class: "key-vou" },   // 10 commas
+            { note: "Ga", ratio: Math.pow(COMMA_MULT_DIAT, 18), class: "key-ga" },    // 10 + 8 = 18 commas
+            { note: "Di", ratio: Math.pow(COMMA_MULT_DIAT, 30), class: "key-di" },    // 18 + 12 = 30 commas
+            { note: "Ke", ratio: Math.pow(COMMA_MULT_DIAT, 42), class: "key-ke" },    // 30 + 12 = 42 commas
+            { note: "Zo", ratio: Math.pow(COMMA_MULT_DIAT, 52), class: "key-zo" },    // 42 + 10 = 52 commas
+            { note: "Ni", ratio: Math.pow(COMMA_MULT_DIAT, 60), class: "key-ni" },    // 52 + 8 = 60 commas
+            { note: "Pa'", ratio: Math.pow(COMMA_MULT_DIAT, 72), class: "key-pa-octave" }, // 60 + 12 = 72 commas
+            { note: "Vou'", ratio: Math.pow(COMMA_MULT_DIAT, 82), class: "key-vou-high" } // 72 + 10 = 82 commas
+        ];
+
+        // The Byzantine Soft Chromatic Mode in 64 commas, according to https://www.patriarchalpsaltophiles.org
+        const BYZANTINE_SOFT_CHROM_SCALE = [
+            { note: "Ni,", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, -19), class: "key-ni-low" },
+            { note: "Pa", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, -12), class: "key-pa" },
+            { note: "Vou", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, 0), class: "key-vou" },
+            { note: "Ga", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, 7), class: "key-ga" },
+            { note: "Di", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, 19), class: "key-di" },
+            { note: "Ke", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, 26), class: "key-ke" },
+            { note: "Zo", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, 38), class: "key-zo" },
+            { note: "Ni", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, 45), class: "key-ni" },
+            { note: "Pa'", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, 52), class: "key-pa-octave" },
+            { note: "Vou'", ratio: Math.pow(COMMA_MULT_SOFT_CHROM, 64), class: "key-vou-high" }
         ];
 
         const keyboardContainer = document.getElementById('keyboard');
@@ -278,13 +307,17 @@
          * Renders the keyboard keys and attaches event listeners for continuous play.
          */
         function renderKeyboard() {
-            BYZANTINE_DIATONIC_SCALE.forEach(noteData => {
+            // Clear existing keys
+            keyboardContainer.innerHTML = '';
+
+            // Use provided currentScale
+            currentScale.forEach(noteData => {
                 const noteName = noteData.note;
                 const ratio = noteData.ratio;
 
                 const keyElement = document.createElement('div');
-                keyElement.id = `key-${noteName.toLowerCase().replace(/['",]/g, '')}`;
-                keyElement.className = `key ${noteData.class} p-6 m-1 rounded-lg text-center font-semibold uppercase text-lg w-20 h-28 flex flex-col justify-end items-center transition-all duration-100 ease-in-out hover:opacity-90 active:scale-[0.98]`;
+                keyElement.id = `key-${noteName.toLowerCase().replace(/['",\s]/g, '')}`;
+                keyElement.className = `key ${noteData.class || ''} p-6 m-1 rounded-lg text-center font-semibold uppercase text-lg w-20 h-28 flex flex-col justify-end items-center transition-all duration-100 ease-in-out hover:opacity-90 active:scale-[0.98]`;
                 keyElement.setAttribute('data-note', noteName);
 
                 // Display Note Name
@@ -293,32 +326,47 @@
                 `;
 
                 // --- Event Listeners for Press-and-Hold ---
-
-                // 1. MOUSE DOWN / TOUCH START: Start the note, passing the ratio
                 const startFunc = (e) => {
-                    // Prevent context menu on long touch
-                    if (e.type === 'touchstart') e.preventDefault(); 
-                    startNote(noteName, ratio, keyElement); 
+                    if (e.type === 'touchstart') e.preventDefault();
+                    startNote(noteName, ratio, keyElement);
                 };
-                keyElement.addEventListener('mousedown', startFunc);
-                keyElement.addEventListener('touchstart', startFunc); 
-
-                // 2. MOUSE UP / TOUCH END / MOUSE LEAVE: Stop the note
                 const stopFunc = () => stopNote(noteName);
+
+                keyElement.addEventListener('mousedown', startFunc);
+                keyElement.addEventListener('touchstart', startFunc);
                 keyElement.addEventListener('mouseup', stopFunc);
-                keyElement.addEventListener('touchend', stopFunc); 
+                keyElement.addEventListener('touchend', stopFunc);
                 keyElement.addEventListener('mouseleave', stopFunc);
 
                 keyboardContainer.appendChild(keyElement);
             });
-            
-            // Global listener to stop notes if the mouse is released anywhere on the body after a drag
-            document.body.addEventListener('mouseup', (e) => {
-                // Check if the event target is not a key element and stop all notes
-                if (!e.target.closest('.key')) {
-                    activeNotes.forEach((_, noteName) => stopNote(noteName));
-                }
-            });
+
+            // Attach body mouseup listener only once to avoid duplicates
+            if (!bodyMouseUpListenerAdded) {
+                document.body.addEventListener('mouseup', (e) => {
+                    if (!e.target.closest('.key')) {
+                        // Stop all active notes
+                        Array.from(activeNotes.keys()).forEach(noteName => stopNote(noteName));
+                    }
+                });
+                bodyMouseUpListenerAdded = true;
+            }
+        }
+
+        /**
+         * Switch keyboard mode and re-render keys.
+         */
+        function setMode(mode) {
+            // Stop any playing notes
+            Array.from(activeNotes.keys()).forEach(noteName => stopNote(noteName));
+
+            if (mode === 'soft-chromatic') {
+                currentScale = BYZANTINE_SOFT_CHROM_SCALE;
+            } else {
+                currentScale = BYZANTINE_DIATONIC_SCALE;
+            }
+            currentMode = mode;
+            renderKeyboard();
         }
 
         // Initialize status message and pitch control on load
@@ -334,9 +382,18 @@
             // Add listener for reset button
             resetButton.addEventListener('click', resetPitch);
             
+            // Mode selector handling
+            const modeSelect = document.getElementById('mode-select');
+            if (modeSelect) {
+                modeSelect.addEventListener('change', (e) => {
+                    setMode(e.target.value);
+                });
+            }
+            
             if (window.AudioContext || window.webkitAudioContext) {
                 statusMessage.classList.remove('hidden');
-                renderKeyboard();
+                // Render initial keyboard for default mode
+                setMode(currentMode);
             } else {
                 statusMessage.innerHTML = `<p class="font-bold">Error</p><p>Your browser does not support the Web Audio API required for this app.</p>`;
                 statusMessage.classList.remove('hidden');
