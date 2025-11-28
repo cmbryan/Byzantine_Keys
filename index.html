@@ -109,6 +109,24 @@
         let currentMode = 'diatonic';
         let currentScale;
         let bodyMouseUpListenerAdded = false;
+        
+        // Map QWERTY home row keys to scale indices
+        // A, S, D, F, G, H, J, K, L → 0-8 in the scale
+        const QWERTY_KEYMAP = {
+            'a': 0,  // Ni,
+            's': 1,  // Pa
+            'd': 2,  // Vou
+            'f': 3,  // Ga
+            'g': 4,  // Di
+            'h': 5,  // Ke
+            'j': 6,  // Zo
+            'k': 7,  // Ni
+            'l': 8,  // Pa'
+            ';': 9   // Vou'
+        };
+        
+        // Track which keyboard keys are currently pressed
+        const pressedKeys = new Set();
 
         // Define harmonic coefficients for a rich, vowel-like sound (PeriodicWave)
         const REAL_COEFFICIENTS = new Float32Array([0, 1.0, 0.4, 0.2, 0.1, 0.05, 0.02, 0]);
@@ -311,18 +329,24 @@
             keyboardContainer.innerHTML = '';
 
             // Use provided currentScale
-            currentScale.forEach(noteData => {
+            currentScale.forEach((noteData, index) => {
                 const noteName = noteData.note;
                 const ratio = noteData.ratio;
 
                 const keyElement = document.createElement('div');
-                keyElement.id = `key-${noteName.toLowerCase().replace(/['",\s]/g, '')}`;
+                keyElement.id = `key-${index}-${noteName.toLowerCase().replace(/['",\s]/g, '')}`;
                 keyElement.className = `key ${noteData.class || ''} p-6 m-1 rounded-lg text-center font-semibold uppercase text-lg w-20 h-28 flex flex-col justify-end items-center transition-all duration-100 ease-in-out hover:opacity-90 active:scale-[0.98]`;
                 keyElement.setAttribute('data-note', noteName);
 
-                // Display Note Name
+                // Get the QWERTY key for this index
+                const qwertyKeys = Object.entries(QWERTY_KEYMAP);
+                const qwertyKey = qwertyKeys.find(([, idx]) => idx === index)?.[0];
+                const displayKey = qwertyKey === ';' ? ';' : qwertyKey?.toUpperCase() || '';
+
+                // Display Note Name and QWERTY Key
                 keyElement.innerHTML = `
-                    <span class="text-3xl font-extrabold">${noteName.replace(/'/g, '’')}</span>
+                    <span class="text-3xl font-extrabold">${noteName.replace(/'/g, '\'')}</span>
+                    ${displayKey ? `<span class="text-xs opacity-60 mt-1">${displayKey}</span>` : ''}
                 `;
 
                 // --- Event Listeners for Press-and-Hold ---
@@ -369,6 +393,47 @@
             renderKeyboard();
         }
 
+        /**
+         * Handles keyboard keydown events for QWERTY home row keys (A-L).
+         */
+        function handleKeyDown(e) {
+            const key = e.key.toLowerCase();
+            
+            // Only process if it's a mapped QWERTY key and not already pressed
+            if (QWERTY_KEYMAP.hasOwnProperty(key) && !pressedKeys.has(key)) {
+                e.preventDefault();
+                pressedKeys.add(key);
+                
+                const scaleIndex = QWERTY_KEYMAP[key];
+                if (scaleIndex < currentScale.length) {
+                    const noteData = currentScale[scaleIndex];
+                    const keyElement = document.getElementById(`key-${scaleIndex}-${noteData.note.toLowerCase().replace(/['",\s]/g, '')}`);
+                    if (keyElement) {
+                        startNote(noteData.note, noteData.ratio, keyElement);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Handles keyboard keyup events for QWERTY home row keys (A-L).
+         */
+        function handleKeyUp(e) {
+            const key = e.key.toLowerCase();
+            
+            // Only process if it's a mapped QWERTY key
+            if (QWERTY_KEYMAP.hasOwnProperty(key) && pressedKeys.has(key)) {
+                e.preventDefault();
+                pressedKeys.delete(key);
+                
+                const scaleIndex = QWERTY_KEYMAP[key];
+                if (scaleIndex < currentScale.length) {
+                    const noteData = currentScale[scaleIndex];
+                    stopNote(noteData.note);
+                }
+            }
+        }
+
         // Initialize status message and pitch control on load
         window.onload = function() {
             // Set initial pitch value and display label
@@ -389,6 +454,10 @@
                     setMode(e.target.value);
                 });
             }
+            
+            // Add keyboard event listeners for QWERTY home row
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
             
             if (window.AudioContext || window.webkitAudioContext) {
                 statusMessage.classList.remove('hidden');
