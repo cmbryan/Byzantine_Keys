@@ -122,16 +122,16 @@
         // Ratios are relative to Pa (C^0) and calculated using the COMMA_MULT_DIAT
         // Comma steps from Pa: 0, 10, 18, 30, 42, 52, 60, 72, 82. Low Ni is -12.
         const BYZANTINE_DIATONIC_SCALE = [
-            { note: "Ni,", ratio: Math.pow(COMMA_MULT_DIAT, -12), class: "key-ni-low" }, // -12 commas
-            { note: "Pa", ratio: Math.pow(COMMA_MULT_DIAT, 0), class: "key-pa" },      // 0 commas
-            { note: "Vou", ratio: Math.pow(COMMA_MULT_DIAT, 10), class: "key-vou" },   // 10 commas
-            { note: "Ga", ratio: Math.pow(COMMA_MULT_DIAT, 18), class: "key-ga" },    // 10 + 8 = 18 commas
-            { note: "Di", ratio: Math.pow(COMMA_MULT_DIAT, 30), class: "key-di" },    // 18 + 12 = 30 commas
-            { note: "Ke", ratio: Math.pow(COMMA_MULT_DIAT, 42), class: "key-ke" },    // 30 + 12 = 42 commas
-            { note: "Zo", ratio: Math.pow(COMMA_MULT_DIAT, 52), class: "key-zo" },    // 42 + 10 = 52 commas
-            { note: "Ni", ratio: Math.pow(COMMA_MULT_DIAT, 60), class: "key-ni" },    // 52 + 8 = 60 commas
-            { note: "Pa'", ratio: Math.pow(COMMA_MULT_DIAT, 72), class: "key-pa-octave" }, // 60 + 12 = 72 commas
-            { note: "Vou'", ratio: Math.pow(COMMA_MULT_DIAT, 82), class: "key-vou-high" } // 72 + 10 = 82 commas
+            { note: "Ni,", ratio: Math.pow(COMMA_MULT_DIAT, -22), class: "key-ni-low" }, // -12 commas
+            { note: "Pa", ratio: Math.pow(COMMA_MULT_DIAT, -10), class: "key-pa" },      // 0 commas
+            { note: "Vou", ratio: Math.pow(COMMA_MULT_DIAT, 0), class: "key-vou" },   // 10 commas
+            { note: "Ga", ratio: Math.pow(COMMA_MULT_DIAT, 8), class: "key-ga" },    // 10 + 8 = 18 commas
+            { note: "Di", ratio: Math.pow(COMMA_MULT_DIAT, 20), class: "key-di" },    // 18 + 12 = 30 commas
+            { note: "Ke", ratio: Math.pow(COMMA_MULT_DIAT, 32), class: "key-ke" },    // 30 + 12 = 42 commas
+            { note: "Zo", ratio: Math.pow(COMMA_MULT_DIAT, 42), class: "key-zo" },    // 42 + 10 = 52 commas
+            { note: "Ni", ratio: Math.pow(COMMA_MULT_DIAT, 50), class: "key-ni" },    // 52 + 8 = 60 commas
+            { note: "Pa'", ratio: Math.pow(COMMA_MULT_DIAT, 62), class: "key-pa-octave" }, // 60 + 12 = 72 commas
+            { note: "Vou'", ratio: Math.pow(COMMA_MULT_DIAT, 72), class: "key-vou-high" } // 72 + 10 = 82 commas
         ];
 
         // The Byzantine Soft Chromatic Mode in 64 commas, according to https://www.patriarchalpsaltophiles.org
