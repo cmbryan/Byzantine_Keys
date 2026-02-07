@@ -78,6 +78,14 @@
                 </label>
             </div>
             
+            <div class="flex items-center gap-4 mt-4">
+                <label for="sticky-toggle" class="text-sm font-semibold text-gray-700">Sticky Keys:</label>
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="sticky-toggle" class="w-5 h-5 rounded text-purple-600">
+                    <span class="ml-2 text-sm text-gray-700">Press again to release</span>
+                </label>
+            </div>
+            
             <div class="flex justify-between items-center mt-3">
                 <p class="text-xs text-gray-500">Range: One whole tone down to one whole tone up.</p>
                 <button id="reset-pitch-button" class="px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition duration-150 shadow-md">
@@ -118,6 +126,8 @@
         let currentScale;
         let bodyMouseUpListenerAdded = false;
         let octaveDropActive = false;
+        let stickyModeActive = false;
+        const stickyNotes = new Set(); // Tracks notes that are stuck playing
         
         // Map QWERTY home row keys to scale indices
         // A, S, D, F, G, H, J, K, L → 0-8 in the scale
@@ -250,8 +260,21 @@
         function startNote(noteName, ratio, keyElement) {
             initAudio();
 
-            if (!isAudioReady || activeNotes.has(noteName)) {
-                return; // Prevent re-triggering the same note while holding
+            // In sticky mode, toggle the note on/off
+            if (stickyModeActive) {
+                if (stickyNotes.has(noteName)) {
+                    // Note is already sticky playing, so stop it
+                    stopNote(noteName);
+                    return;
+                } else if (activeNotes.has(noteName)) {
+                    // Note is already playing (shouldn't happen in sticky mode, but handle it)
+                    return;
+                }
+                // Mark this note as sticky
+                stickyNotes.add(noteName);
+            } else if (activeNotes.has(noteName)) {
+                // Normal mode: prevent re-triggering the same note while holding
+                return;
             }
 
             // Calculate dynamic frequency based on current base pitch and note ratio
@@ -331,8 +354,9 @@
                 oscillator.stop(now + RELEASE_TIME + 0.1);
             });
 
-            // Remove from the active notes map
+            // Remove from the active notes map and sticky notes set
             activeNotes.delete(noteName);
+            stickyNotes.delete(noteName);
         }
 
         /**
@@ -368,7 +392,13 @@
                     if (e.type === 'touchstart') e.preventDefault();
                     startNote(noteName, ratio, keyElement);
                 };
-                const stopFunc = () => stopNote(noteName);
+                const stopFunc = () => {
+                    // In sticky mode, don't auto-stop on mouseup/touchend/mouseleave
+                    if (stickyModeActive) {
+                        return;
+                    }
+                    stopNote(noteName);
+                };
 
                 keyElement.addEventListener('mousedown', startFunc);
                 keyElement.addEventListener('touchstart', startFunc);
@@ -397,6 +427,8 @@
         function setMode(mode) {
             // Stop any playing notes
             Array.from(activeNotes.keys()).forEach(noteName => stopNote(noteName));
+            // Clear sticky notes
+            stickyNotes.clear();
 
             if (mode === 'soft-chromatic') {
                 currentScale = BYZANTINE_SOFT_CHROM_SCALE;
@@ -440,6 +472,11 @@
                 e.preventDefault();
                 pressedKeys.delete(key);
                 
+                // In sticky mode, don't auto-stop on key release
+                if (stickyModeActive) {
+                    return;
+                }
+                
                 const scaleIndex = QWERTY_KEYMAP[key];
                 if (scaleIndex < currentScale.length) {
                     const noteData = currentScale[scaleIndex];
@@ -474,6 +511,18 @@
             if (octaveDropToggle) {
                 octaveDropToggle.addEventListener('change', (e) => {
                     octaveDropActive = e.target.checked;
+                });
+            }
+            
+            // Sticky keys toggle handling
+            const stickyToggle = document.getElementById('sticky-toggle');
+            if (stickyToggle) {
+                stickyToggle.addEventListener('change', (e) => {
+                    stickyModeActive = e.target.checked;
+                    // Clear all sticky notes when toggling off
+                    if (!stickyModeActive) {
+                        Array.from(stickyNotes).forEach(noteName => stopNote(noteName));
+                    }
                 });
             }
             
