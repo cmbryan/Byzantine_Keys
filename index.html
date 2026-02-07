@@ -70,6 +70,14 @@
                 </select>
             </div>
             
+            <div class="flex items-center gap-4 mt-4">
+                <label for="octave-drop-toggle" class="text-sm font-semibold text-gray-700">Octave Drop:</label>
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="octave-drop-toggle" class="w-5 h-5 rounded text-purple-600">
+                    <span class="ml-2 text-sm text-gray-700">Drop 1 octave</span>
+                </label>
+            </div>
+            
             <div class="flex justify-between items-center mt-3">
                 <p class="text-xs text-gray-500">Range: One whole tone down to one whole tone up.</p>
                 <button id="reset-pitch-button" class="px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition duration-150 shadow-md">
@@ -109,6 +117,7 @@
         let currentMode = 'diatonic';
         let currentScale;
         let bodyMouseUpListenerAdded = false;
+        let octaveDropActive = false;
         
         // Map QWERTY home row keys to scale indices
         // A, S, D, F, G, H, J, K, L → 0-8 in the scale
@@ -246,7 +255,12 @@
             }
 
             // Calculate dynamic frequency based on current base pitch and note ratio
-            const frequency = currentBaseFrequency * ratio; 
+            let frequency = currentBaseFrequency * ratio;
+            
+            // Apply octave drop if active (multiply by 0.5 for each octave down)
+            if (octaveDropActive) {
+                frequency *= 0.5;
+            } 
             
             keyElement.classList.add('active-playing');
             const noteVoices = [];
@@ -452,6 +466,14 @@
             if (modeSelect) {
                 modeSelect.addEventListener('change', (e) => {
                     setMode(e.target.value);
+                });
+            }
+            
+            // Octave drop toggle handling
+            const octaveDropToggle = document.getElementById('octave-drop-toggle');
+            if (octaveDropToggle) {
+                octaveDropToggle.addEventListener('change', (e) => {
+                    octaveDropActive = e.target.checked;
                 });
             }
             
